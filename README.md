@@ -2,9 +2,9 @@
 
 A Rust performance skill for Claude Code, Codex, and other agents that support [Agent Skills](https://agentskills.io/specification).
 
-It guides the agent through profiling, benchmarking, and small changes that preserve behavior. It covers allocation costs, data structures, memory layout, async stalls, SIMD, parallelism, and build tuning. Each technique needs evidence from the workload.
+Use it to investigate slow Rust code and test optimizations against a baseline. It covers allocations, data structures, memory layout, async code, SIMD, parallelism, and compiler settings. The workflow requires measurements before keeping a change.
 
-See [a first run on CarryFS](#example-carryfs-catalog-keys) for a concrete change and its reported benchmark.
+The [CarryFS example](#example-carryfs-catalog-keys) includes before-and-after code and recorded benchmark results.
 
 ## Install
 
@@ -14,7 +14,7 @@ With Node.js 22.20 or later, run this from the project where you want the skill:
     npx skills add painhardcore/blazing-rust --skill blazing-rust
 ```
 
-Choose your agent when prompted. To select one directly:
+Choose your agent when prompted, or select it with `-a`:
 
 ```sh
 # Claude Code
@@ -26,7 +26,7 @@ npx skills add painhardcore/blazing-rust --skill blazing-rust -a codex
 
 Add `-g` to install for all your projects. The [skills CLI](https://github.com/vercel-labs/skills#readme) also supports Cursor, OpenCode, and other agents.
 
-To try an unpublished checkout, replace `painhardcore/blazing-rust` with its absolute local path.
+To install from a local checkout, replace `painhardcore/blazing-rust` with its absolute path.
 
 ## Install without Node.js
 
@@ -54,9 +54,9 @@ mkdir -p "$skill_dir/references"
 cp -i references/techniques.md "$skill_dir/references/"
 ```
 
-For Codex, set `skill_dir="$HOME/.agents/skills/blazing-rust"` instead. For another agent, copy `SKILL.md`, `LICENSE`, and the `references` directory into a folder named `blazing-rust` in its skills directory.
+For Codex, set `skill_dir="$HOME/.agents/skills/blazing-rust"` instead. For other agents, use their skills directory. Copy `SKILL.md`, `LICENSE`, and `references` into a folder named `blazing-rust`.
 
-The paths follow the official [Claude Code](https://code.claude.com/docs/en/skills#choose-where-skills-load) and [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) documentation.
+See the [Claude Code](https://code.claude.com/docs/en/skills#choose-where-skills-load) and [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) documentation for supported skill locations.
 
 ## Use
 
@@ -74,15 +74,15 @@ Codex:
 $blazing-rust Investigate why parsing large files is slow. Measure a baseline, optimize the bottleneck, and verify the result.
 ```
 
-The agent can also select the skill for relevant Rust performance requests. Include representative inputs, your target metric, and deployment constraints when you have them.
+The agent can also load the skill when you ask about Rust performance. Give it representative inputs, a target metric, and any deployment constraints.
 
-The skill uses your project's Rust toolchain and existing measurement tools. Criterion, profilers, and other tools are optional. It requires the agent to report missing measurements rather than invent results.
+The skill uses your project's Rust toolchain and measurement tools. It does not require Criterion or a profiler. When a tool is unavailable, the agent must state what it could not measure.
 
-The main skill contains the workflow and technique selection table. The agent reads relevant sections of [the technique guide](references/techniques.md) when it needs implementation details.
+The [technique guide](references/techniques.md) has detailed optimization advice. The agent reads the sections relevant to the workload.
 
 ## Example: CarryFS catalog keys
 
-In [CarryFS PR #33](https://github.com/carry-fs/carryfs/pull/33), one change replaced heap-allocated catalog keys with fixed-size arrays. An inode key always contains an eight-byte object ID followed by a one-byte tag.
+A first run on [CarryFS](https://github.com/carry-fs/carryfs/pull/33) replaced heap-allocated catalog keys with fixed-size arrays. An inode key contains an eight-byte object ID and a one-byte tag, so it needs exactly nine bytes.
 
 Before:
 
@@ -105,16 +105,16 @@ fn inode_key(object: u64) -> [u8; 9] {
 }
 ```
 
-The [commit](https://github.com/carry-fs/carryfs/commit/ebb6e9a815ab2fbdbf0aa63a463e97083e300770) also changed the fixed-size extent and group keys to arrays. Variable-length directory keys kept their `Vec` representation and reserved capacity once. Callers converted arrays to `Vec` where existing APIs required that type.
+The [same commit](https://github.com/carry-fs/carryfs/commit/ebb6e9a815ab2fbdbf0aa63a463e97083e300770) changed extent and group keys to arrays. Variable-length directory keys still use `Vec`, with capacity reserved once. Some callers convert arrays to `Vec` to satisfy existing APIs.
 
-The commit reports these results for read-write lookups across 10,000 files:
+The commit reports these lookup times for 10,000 files in read-write mode:
 
 | Version | Median | Reported range |
 | --- | --- | --- |
 | Before the commit | 2.69 ms | 2.60 to 2.99 ms |
 | After the commit | 1.94 ms | 1.88 to 2.11 ms |
 
-The commit records release builds, "CPU 2", and a median of five alternating processes with five rounds each. The [core benchmark](https://github.com/carry-fs/carryfs/blob/ebb6e9a815ab2fbdbf0aa63a463e97083e300770/benches/core.rs) uses a RAM-backed device. These figures describe library lookups, not mounted-filesystem or disk throughput.
+The commit lists release builds and "CPU 2". It reports a median of five alternating processes with five rounds each. The [core benchmark](https://github.com/carry-fs/carryfs/blob/ebb6e9a815ab2fbdbf0aa63a463e97083e300770/benches/core.rs) uses a RAM-backed device, so the figures measure library lookups rather than mounted-filesystem or disk throughput.
 
 From a CarryFS checkout, run the checked-in workload with:
 
@@ -122,9 +122,18 @@ From a CarryFS checkout, run the checked-in workload with:
 CARRYFS_BENCH_ROUNDS=5 cargo bench --bench core
 ```
 
-Compare the linked commit with its parent. The command runs the workload but does not automate the alternating comparison. The commit does not record the CPU model, operating system, Rust version, or raw samples. These are commit-reported results, not an independently reproduced benchmark.
+Compare the linked commit with its parent. The command runs the workload. You must alternate the versions yourself. The commit omits the CPU model, operating system, Rust version, and raw samples. The figures above come from the commit notes and have not been independently reproduced here.
 
-Another [change in the same PR](https://github.com/carry-fs/carryfs/commit/f968140ec85bf54bbb2c21ce80a7db37b367de83) coalesced allocation runs in place. It reported 14,338 fewer allocator calls per core round, with inconclusive latency results. Fewer allocations alone do not establish a speedup.
+Another [commit](https://github.com/carry-fs/carryfs/commit/f968140ec85bf54bbb2c21ce80a7db37b367de83) merged allocation runs in place. It reported 14,338 fewer allocator calls per core round. The latency results were inconclusive, so this change has no demonstrated speedup.
+
+The PR also reports two larger improvements for mixed-Unicode directory reads and file metadata lookups:
+
+| Change | Before | After | Latency reduction |
+| --- | --- | --- | --- |
+| [Skip unnecessary Unicode lookups](https://github.com/carry-fs/carryfs/commit/3122eb405437fed0ecfca28bf75799652390185b) | 60.79 ms | 33.74 ms | 44.5% |
+| [Fast-path ASCII processing](https://github.com/carry-fs/carryfs/commit/a6f69ef703ee1ecea25c61c449a92e6b40b24c25) | 34.31 ms | 21.59 ms | 37.1% |
+
+Each row compares one commit with its parent. The figures come from the commit notes. The repository does not include the mixed-Unicode benchmark workload.
 
 ## License
 
