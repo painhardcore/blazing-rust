@@ -4,6 +4,8 @@ A Rust performance skill for Claude Code, Codex, and other agents that support [
 
 It guides the agent through profiling, benchmarking, and small changes that preserve behavior. It covers allocation costs, data structures, memory layout, async stalls, SIMD, parallelism, and build tuning. Each technique needs evidence from the workload.
 
+See [a first run on CarryFS](#example-carryfs-catalog-keys) for a concrete change and its reported benchmark.
+
 ## Install
 
 With Node.js 22.20 or later, run this from the project where you want the skill:
@@ -77,6 +79,52 @@ The agent can also select the skill for relevant Rust performance requests. Incl
 The skill uses your project's Rust toolchain and existing measurement tools. Criterion, profilers, and other tools are optional. It requires the agent to report missing measurements rather than invent results.
 
 The main skill contains the workflow and technique selection table. The agent reads relevant sections of [the technique guide](references/techniques.md) when it needs implementation details.
+
+## Example: CarryFS catalog keys
+
+In [CarryFS PR #33](https://github.com/carry-fs/carryfs/pull/33), one change replaced heap-allocated catalog keys with fixed-size arrays. An inode key always contains an eight-byte object ID followed by a one-byte tag.
+
+Before:
+
+```rust
+fn inode_key(object: u64) -> Vec<u8> {
+    let mut key = object.to_be_bytes().to_vec();
+    key.push(1);
+    key
+}
+```
+
+After:
+
+```rust
+fn inode_key(object: u64) -> [u8; 9] {
+    let mut key = [0; 9];
+    key[..8].copy_from_slice(&object.to_be_bytes());
+    key[8] = 1;
+    key
+}
+```
+
+The [commit](https://github.com/carry-fs/carryfs/commit/ebb6e9a815ab2fbdbf0aa63a463e97083e300770) also changed the fixed-size extent and group keys to arrays. Variable-length directory keys kept their `Vec` representation and reserved capacity once. Callers converted arrays to `Vec` where existing APIs required that type.
+
+The commit reports these results for read-write lookups across 10,000 files:
+
+| Version | Median | Reported range |
+| --- | --- | --- |
+| Before the commit | 2.69 ms | 2.60 to 2.99 ms |
+| After the commit | 1.94 ms | 1.88 to 2.11 ms |
+
+The commit records release builds, "CPU 2", and a median of five alternating processes with five rounds each. The [core benchmark](https://github.com/carry-fs/carryfs/blob/ebb6e9a815ab2fbdbf0aa63a463e97083e300770/benches/core.rs) uses a RAM-backed device. These figures describe library lookups, not mounted-filesystem or disk throughput.
+
+From a CarryFS checkout, run the checked-in workload with:
+
+```sh
+CARRYFS_BENCH_ROUNDS=5 cargo bench --bench core
+```
+
+Compare the linked commit with its parent. The command runs the workload but does not automate the alternating comparison. The commit does not record the CPU model, operating system, Rust version, or raw samples. These are commit-reported results, not an independently reproduced benchmark.
+
+Another [change in the same PR](https://github.com/carry-fs/carryfs/commit/f968140ec85bf54bbb2c21ce80a7db37b367de83) coalesced allocation runs in place. It reported 14,338 fewer allocator calls per core round, with inconclusive latency results. Fewer allocations alone do not establish a speedup.
 
 ## License
 
