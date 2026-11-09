@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: keeps-already-optimal-checksum
+expected_outcome: |
+  The loop already compiles to unrolled vector adds, so there is little or
+  nothing to gain inside the function. The agent measures it in a release build,
+  checks the generated code, keeps the original unless a change wins outside the
+  noise, and tells the user plainly where a real gain would have to come from
+  (fewer calls, verifying pages lazily, a different checksum) instead of
+  claiming a speedup.
+context:
+  scaffold_script: place-files.sh

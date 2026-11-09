@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: speeds-up-allocating-parser
+expected_outcome: |
+  The agent measures the original status_counts on generated input in a release build,
+  removes the per-line and per-field String allocations (borrowing &str and avoiding
+  the format!/clone/double-lookup pattern), keeps the counts identical, adds no
+  dependencies, and reports before/after timings with repeated runs.
+context:
+  scaffold_script: place-files.sh

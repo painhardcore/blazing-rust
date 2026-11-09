@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: explains-quadratic-merge
+expected_outcome: |
+  The agent leaves the source unchanged and explains both quadratic parts: the
+  duplicate check that scans the output vector for every event, and the
+  selection sort that rescans and calls Vec::remove for every element. It backs
+  the diagnosis with a measurement (for example timings at growing sizes) or
+  says plainly that it did not measure, and notes the behavior a fix must keep.
+context:
+  scaffold_script: place-files.sh

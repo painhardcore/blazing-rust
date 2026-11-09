@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: simd-request-on-stable
+expected_outcome: |
+  The agent checks whether the existing loop already auto-vectorizes and measures
+  it in a release build before writing SIMD. It stays on stable Rust (no
+  std::simd), gates any explicit intrinsics by target with a scalar fallback,
+  tests empty and odd-length inputs, and keeps the rewrite only if repeated
+  measurements show a real gain.
+context:
+  scaffold_script: place-files.sh
