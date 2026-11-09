@@ -2,9 +2,33 @@
 
 A Rust performance skill for Claude Code, Codex, and other agents that support [Agent Skills](https://agentskills.io/specification).
 
-Use it to investigate slow Rust code and test optimizations against a baseline. It covers allocations, data structures, memory layout, async code, SIMD, parallelism, and compiler settings. The workflow requires measurements before keeping a change.
+The agent measures a baseline, finds the bottleneck, and pushes it toward the hardware limit one measured change at a time. It stops at lines it will not cross on its own: changed behavior, unsound `unsafe`, weaker security, new threads in library code, and new dependencies or build settings. Faster options beyond those lines are reported with their measured gain. It covers allocations, data structures, memory layout, async code, SIMD, parallelism, and compiler settings.
 
-The [CarryFS example](#example-carryfs-catalog-keys) includes before-and-after code and recorded benchmark results.
+## Results
+
+Four tasks, each run with and without the skill on the same prompt, with no user instructions loaded. 27 checks cover:
+- measuring before editing;
+- correct results;
+- not crossing the lines above;
+- pushing past the first win;
+- not editing code when only asked why it is slow.
+
+| Model | Checks passed with the skill | Without the skill |
+| --- | --- | --- |
+| Claude Opus 5.5 | **100%** | 82% |
+| Claude Sonnet 5.5, high effort | **96%** | 76% |
+| Claude Haiku 5.5 | **97%** | 79% |
+
+What changed with the skill, on Opus:
+
+| Task | With the skill | Without the skill |
+| --- | --- | --- |
+| Speed up an allocation-heavy log parser | **46x faster** on one thread. It keeps the collision-resistant hasher, adds no threads, and reports that 4 threads would give another 3.7x. | 32x, using a weak hasher on untrusted input and threads inside a library function |
+| Rewrite a byte counter with SIMD on stable Rust | **14x faster with no `unsafe`.** It wrote hand-written NEON code, measured it, and did not ship it because the safe version was as fast. | 15x with 10 `unsafe` blocks, never compared to a safe version |
+| Explain why an event merge is slow | Confirms both O(n²) loops at small sizes, extrapolates the full case, and edits nothing | Retries the minute-long full-size run until the process is killed |
+| Speed up a checksum that is already vectorized | Keeps the original code and shows it is within about 20% of the L1-cache limit and near memory bandwidth beyond it | Also keeps it, but does not say how much headroom is left |
+
+Sonnet with the skill produced safe 12–19x speedups at about a fifth of Opus's cost. With the skill, runs take roughly twice the time and tokens of runs without it, because the agent measures more. These are single runs on an Apple M1, so treat individual numbers as rough. The test cases are in [`evals/`](evals).
 
 ## Install
 
@@ -76,64 +100,36 @@ $blazing-rust Investigate why parsing large files is slow. Measure a baseline, o
 
 The agent can also load the skill when you ask about Rust performance. Give it representative inputs, a target metric, and any deployment constraints.
 
+## Steer it from the prompt
+
+By default the agent keeps pushing until it meets your target, reaches the hardware limit, or runs out of candidates that stay within its lines. Add a sentence to your prompt to move a line:
+
+| Default | To change it, say |
+| --- | --- |
+| `unsafe` is kept only when it beats the best safe version by more than the noise, with a portable fallback and tests | "Safe Rust only." or "No `unsafe` unless it's at least 2x faster." |
+| Library code gets no new threads; the multicore gain is reported | "This is a CLI that owns its threads; parallelism is fine." |
+| No new dependencies, build settings, or installed tools | "You may add crates." or "You may enable LTO and `target-cpu=native`; we deploy on one CPU type." |
+| Hashers stay collision-resistant for untrusted keys | "Keys are trusted internal IDs." |
+| Pushes toward the hardware limit, even if the code grows | "Stop at 2x." or "Target: under 50 ms for 1M lines." or "Keep the code simple." |
+| "Why is X slow?" gets measurements and a diagnosis, with no edits | "Explain, then fix it." |
+
+The agent tells you the gain it left on the table, so you can rerun with a looser line if that gain is worth it.
+
 The skill uses your project's Rust toolchain and measurement tools. It does not require Criterion or a profiler. When a tool is unavailable, the agent must state what it could not measure.
 
 The [technique guide](references/techniques.md) has detailed optimization advice. The agent reads the sections relevant to the workload.
 
-## Example: CarryFS catalog keys
+## Example: CarryFS
 
-A first run on [CarryFS](https://github.com/carry-fs/carryfs/pull/33) replaced heap-allocated catalog keys with fixed-size arrays. An inode key contains an eight-byte object ID and a one-byte tag, so it needs exactly nine bytes.
+A run on [CarryFS](https://github.com/carry-fs/carryfs/pull/33) produced these changes. The figures come from the commit notes and have not been reproduced independently.
 
-Before:
-
-```rust
-fn inode_key(object: u64) -> Vec<u8> {
-    let mut key = object.to_be_bytes().to_vec();
-    key.push(1);
-    key
-}
-```
-
-After:
-
-```rust
-fn inode_key(object: u64) -> [u8; 9] {
-    let mut key = [0; 9];
-    key[..8].copy_from_slice(&object.to_be_bytes());
-    key[8] = 1;
-    key
-}
-```
-
-The [same commit](https://github.com/carry-fs/carryfs/commit/ebb6e9a815ab2fbdbf0aa63a463e97083e300770) changed extent and group keys to arrays. Variable-length directory keys still use `Vec`, with capacity reserved once. Some callers convert arrays to `Vec` to satisfy existing APIs.
-
-The commit reports these lookup times for 10,000 files in read-write mode:
-
-| Version | Median | Reported range |
+| Change | Before | After |
 | --- | --- | --- |
-| Before the commit | 2.69 ms | 2.60 to 2.99 ms |
-| After the commit | 1.94 ms | 1.88 to 2.11 ms |
+| [Fixed-size arrays for catalog keys](https://github.com/carry-fs/carryfs/commit/ebb6e9a815ab2fbdbf0aa63a463e97083e300770) instead of `Vec<u8>`: lookups for 10,000 files | 2.69 ms | 1.94 ms (−28%) |
+| [Skip unnecessary Unicode lookups](https://github.com/carry-fs/carryfs/commit/3122eb405437fed0ecfca28bf75799652390185b) in mixed-Unicode directory reads | 60.79 ms | 33.74 ms (−44.5%) |
+| [Fast-path ASCII processing](https://github.com/carry-fs/carryfs/commit/a6f69ef703ee1ecea25c61c449a92e6b40b24c25) | 34.31 ms | 21.59 ms (−37.1%) |
 
-The commit lists release builds and "CPU 2". It reports a median of five alternating processes with five rounds each. The [core benchmark](https://github.com/carry-fs/carryfs/blob/ebb6e9a815ab2fbdbf0aa63a463e97083e300770/benches/core.rs) uses a RAM-backed device, so the figures measure library lookups rather than mounted-filesystem or disk throughput.
-
-From a CarryFS checkout, run the checked-in workload with:
-
-```sh
-CARRYFS_BENCH_ROUNDS=5 cargo bench --bench core
-```
-
-Compare the linked commit with its parent. The command runs the workload. You must alternate the versions yourself. The commit omits the CPU model, operating system, Rust version, and raw samples. The figures above come from the commit notes and have not been independently reproduced here.
-
-Another [commit](https://github.com/carry-fs/carryfs/commit/f968140ec85bf54bbb2c21ce80a7db37b367de83) merged allocation runs in place. It reported 14,338 fewer allocator calls per core round. The latency results were inconclusive, so this change has no demonstrated speedup.
-
-The PR also reports two larger improvements for mixed-Unicode directory reads and file metadata lookups:
-
-| Change | Before | After | Latency reduction |
-| --- | --- | --- | --- |
-| [Skip unnecessary Unicode lookups](https://github.com/carry-fs/carryfs/commit/3122eb405437fed0ecfca28bf75799652390185b) | 60.79 ms | 33.74 ms | 44.5% |
-| [Fast-path ASCII processing](https://github.com/carry-fs/carryfs/commit/a6f69ef703ee1ecea25c61c449a92e6b40b24c25) | 34.31 ms | 21.59 ms | 37.1% |
-
-Each row compares one commit with its parent. The figures come from the commit notes. The repository does not include the mixed-Unicode benchmark workload.
+The key change replaced `object.to_be_bytes().to_vec()` plus a pushed tag byte with a `[u8; 9]` array. Another [commit](https://github.com/carry-fs/carryfs/commit/f968140ec85bf54bbb2c21ce80a7db37b367de83) cut 14,338 allocator calls per round, but its latency results were within noise, so it claims no speedup.
 
 ## License
 
