@@ -13,6 +13,8 @@ Four tasks, each run with and without the skill on the same prompt, with no user
 - pushing past the first win;
 - not editing code when only asked why it is slow.
 
+![Checks passed with and without the skill: Opus 82% to 100%, Sonnet 76% to 96%, Haiku 79% to 97%](.github/results.svg)
+
 | Model | Checks passed with the skill | Without the skill |
 | --- | --- | --- |
 | Claude Opus 5.5 | **100%** | 82% |

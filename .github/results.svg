@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 285" class="scoreboard" width="720" height="285" role="img" aria-label="Checks passed with and without the skill: Opus 82% to 100%, Sonnet 76% to 96%, Haiku 79% to 97%">
+<style>
+  .scoreboard { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+.scoreboard .bg { fill: #ffffff; }
+
+  .scoreboard text { font-size: 14px; fill: #1f2328; }
+  .scoreboard .dim { fill: #6b7280; }
+  .scoreboard .small { font-size: 12px; }
+  .scoreboard .big { font-size: 16px; font-weight: 700; }
+  .scoreboard .acc { fill: #006cac; }
+  .scoreboard .accs { stroke: #006cac; }
+  .scoreboard .base { fill: #6b7280; }
+  .scoreboard .bases { stroke: #6b7280; }
+  .scoreboard .grid { stroke: #e6e6e6; stroke-width: 1; }
+  .scoreboard .ring { stroke: #ffffff; stroke-width: 2; }
+  .scoreboard .b { font-weight: 700; }
+  @media (prefers-color-scheme: dark) {
+.scoreboard .bg { fill: #0d1117; }
+
+  .scoreboard text { font-size: 14px; fill: #e6edf3; }
+  .scoreboard .dim { fill: #9198a1; }
+  .scoreboard .small { font-size: 12px; }
+  .scoreboard .big { font-size: 16px; font-weight: 700; }
+  .scoreboard .acc { fill: #ff6b01; }
+  .scoreboard .accs { stroke: #ff6b01; }
+  .scoreboard .base { fill: #9198a1; }
+  .scoreboard .bases { stroke: #9198a1; }
+  .scoreboard .grid { stroke: #30363d; stroke-width: 1; }
+  .scoreboard .ring { stroke: #0d1117; stroke-width: 2; }
+  .scoreboard .b { font-weight: 700; }
+  }
+</style>
+<rect width="720" height="285" rx="8" class="bg"/>
+<circle cx="230" cy="23" r="6" class="base"/>
+<text x="242.0" y="28.0" class="dim">without the skill</text>
+<circle cx="420" cy="23" r="6" class="acc"/>
+<text x="432.0" y="28.0" class="dim">with the skill</text>
+<line x1="230.0" y1="50" x2="230.0" y2="250" class="grid"/>
+<text x="230.0" y="270.0" class="dim small" text-anchor="middle">70%</text>
+<line x1="380.0" y1="50" x2="380.0" y2="250" class="grid"/>
+<text x="380.0" y="270.0" class="dim small" text-anchor="middle">80%</text>
+<line x1="530.0" y1="50" x2="530.0" y2="250" class="grid"/>
+<text x="530.0" y="270.0" class="dim small" text-anchor="middle">90%</text>
+<line x1="680.0" y1="50" x2="680.0" y2="250" class="grid"/>
+<text x="680.0" y="270.0" class="dim small" text-anchor="middle">100%</text>
+<text x="20.0" y="95.0">Opus 5.5</text>
+<line x1="410.0" y1="90" x2="680.0" y2="90" class="bases" stroke-width="2" opacity="0.5"/>
+<circle cx="410.0" cy="90" r="7" class="base ring"/>
+<circle cx="680.0" cy="90" r="8" class="acc ring"/>
+<text x="396.0" y="95.0" class="dim" text-anchor="end">82%</text>
+<text x="680.0" y="76.0" class="b" text-anchor="middle">100%</text>
+<text x="545.0" y="112.0" class="dim small" text-anchor="middle">+18 points</text>
+<text x="20.0" y="157.0">Sonnet 5.5, high effort</text>
+<line x1="320.0" y1="152" x2="620.0" y2="152" class="bases" stroke-width="2" opacity="0.5"/>
+<circle cx="320.0" cy="152" r="7" class="base ring"/>
+<circle cx="620.0" cy="152" r="8" class="acc ring"/>
+<text x="306.0" y="157.0" class="dim" text-anchor="end">76%</text>
+<text x="620.0" y="138.0" class="b" text-anchor="middle">96%</text>
+<text x="470.0" y="174.0" class="dim small" text-anchor="middle">+20 points</text>
+<text x="20.0" y="219.0">Haiku 5.5</text>
+<line x1="365.0" y1="214" x2="635.0" y2="214" class="bases" stroke-width="2" opacity="0.5"/>
+<circle cx="365.0" cy="214" r="7" class="base ring"/>
+<circle cx="635.0" cy="214" r="8" class="acc ring"/>
+<text x="351.0" y="219.0" class="dim" text-anchor="end">79%</text>
+<text x="635.0" y="200.0" class="b" text-anchor="middle">97%</text>
+<text x="500.0" y="236.0" class="dim small" text-anchor="middle">+18 points</text>
+</svg>
