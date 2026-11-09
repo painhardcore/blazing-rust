@@ -1,6 +1,6 @@
 ---
 name: blazing-rust
-description: Profile and optimize Rust runtime performance with reproducible benchmarks. Use for slow Rust code, latency or throughput regressions, allocation costs, or CPU bottlenecks. Avoid speculative tuning of code without performance evidence.
+description: Profile and optimize Rust runtime performance with reproducible benchmarks. Use whenever someone wants Rust code faster or leaner (slow functions, latency or throughput regressions, allocation churn, CPU hot spots, async stalls), even if nothing has been measured yet. The skill measures first and rejects changes without evidence.
 license: MIT
 ---
 
@@ -10,9 +10,9 @@ Improve measured performance while preserving behavior. Keep the simplest change
 
 ## Measure before editing
 
-1. Identify the workload, target metric, and correctness constraints. Read the hot path and its callers. Respect the project's toolchain, minimum supported Rust version, features, and deployment targets. An explanation request authorizes investigation, not edits or benchmark runs.
+1. Identify the workload, target metric, and correctness constraints. Read the hot path and its callers. Respect the project's toolchain, minimum supported Rust version, features, and deployment targets. An explanation request authorizes measurement and profiling, not edits.
 2. Capture a baseline with the project's optimized production profile, usually `release`. Record the input, exact command, toolchain, flags, CPU, and thread count. Use realistic input sizes and distributions, including small and adverse cases.
-3. Find what limits performance. Profile CPU time, allocations, I/O, or lock waits as appropriate. For async stalls, inspect task scheduling and queue growth with runtime-aware tracing. Use existing tools first. If profiling is unavailable, use targeted measurements and state the limits of the evidence.
+3. Find what limits performance. Profile CPU time, allocations, I/O, or lock waits as appropriate. For async stalls, inspect task scheduling and queue growth with runtime-aware tracing. Use existing tools first; [the profiling section](references/techniques.md#profiling) lists common ones and how to keep symbols in release builds. If profiling is unavailable, use targeted measurements and state the limits of the evidence.
 4. State a hypothesis and make one measurable change. Run focused correctness tests and repeat the same benchmark. Verify the result in the full workload before claiming a user-visible improvement.
 5. Keep supported gains. Undo only your unsuccessful edits, preserving unrelated work. Stop when the target is met or further changes lack evidence.
 

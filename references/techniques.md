@@ -2,6 +2,14 @@
 
 Read the section matching the measured cost. Check each API against the project's minimum supported Rust version. Compare candidates against the same baseline and preserve behavior.
 
+## Profiling
+
+- Release builds usually lack debug symbols, which leaves profiles unreadable. Set `CARGO_PROFILE_RELEASE_DEBUG=line-tables-only` for both baseline and candidate builds. The environment variable keeps `Cargo.toml` unchanged and barely affects code generation. [Cargo profile settings](https://doc.rust-lang.org/cargo/reference/config.html#profile)
+- CPU sampling: `perf record` and `perf report` on Linux, `samply` on Linux and macOS, Instruments on macOS. `perf stat` reports cache misses and branch misses. `cargo flamegraph` wraps these tools. [Profiling tools](https://nnethercote.github.io/perf-book/profiling.html)
+- Allocations: `heaptrack` on Linux needs no code changes. `dhat` reports allocation counts and sizes but adds a dependency and a global allocator, so it needs authorization. Valgrind's `callgrind` gives deterministic instruction counts when timings are noisy.
+- Generated code: `cargo-show-asm` (`cargo asm`) shows a function's optimized assembly. Use it to confirm inlining, removed bounds checks, and vectorization.
+- Async: `tokio-console` shows task polls, wakeups, and stalls. It requires the `console-subscriber` dependency and the `tokio_unstable` cfg, so treat it as a build change.
+
 ## Allocations and layout
 
 - `clone_from` can reuse destination allocations when replacing a `Vec` or `String`. Moving or borrowing can avoid the copy entirely. Buffer reuse retains capacity, so check retained memory after unusually large inputs. [Allocation reuse](https://nnethercote.github.io/perf-book/heap-allocations.html#clone)
@@ -17,6 +25,13 @@ Read the section matching the measured cost. Check each API against the project'
 - Current `HashMap` iteration scans capacity rather than just length. After large deletions, shrinking or rebuilding may help repeated scans. Include maintenance and future growth costs. Keep collision-attack resistance for untrusted keys. [HashMap iteration](https://doc.rust-lang.org/std/collections/struct.HashMap.html#method.iter)
 - Iteration, slicing before a loop, and range assertions can expose enough information to eliminate bounds checks safely. Inspect assembly before considering unchecked indexing. Preserve behavior on short inputs. [Bounds checks](https://nnethercote.github.io/perf-book/bounds-checks.html)
 - For custom iterators, accurate `size_hint` or `ExactSizeIterator` implementations can reduce allocation during collection. Try `extend` instead of collecting and appending. Loop fusion can remove passes, but must preserve side effects, ordering, and numerical behavior. [Iterators](https://nnethercote.github.io/perf-book/iterators.html)
+
+## Vectorization
+
+- Check auto-vectorization first. Fixed-size chunks (`chunks_exact`), slices with known lengths, and simple loop bodies without early exits help the compiler emit SIMD. Confirm the result in the assembly. [Iterators and bounds](https://nnethercote.github.io/perf-book/bounds-checks.html)
+- `std::simd` (portable SIMD) is nightly-only. Do not use it in stable projects. On stable, use `std::arch` intrinsics or an existing SIMD crate the project already depends on. [std::arch](https://doc.rust-lang.org/std/arch/index.html)
+- Gate target-specific code with `#[target_feature(enable = "...")]` and a runtime check such as `is_x86_feature_detected!`. Calling a target-feature function from code compiled without that feature is undefined behavior if the CPU lacks it, so the call needs `unsafe` and the check. Keep a scalar fallback and test it. [Dynamic CPU feature detection](https://doc.rust-lang.org/std/arch/index.html#dynamic-cpu-feature-detection)
+- Test remainder elements, empty and unaligned inputs, and floating-point results. SIMD reductions reorder additions, which can change floating-point output.
 
 ## I/O and text
 

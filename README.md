@@ -11,7 +11,7 @@ The [CarryFS example](#example-carryfs-catalog-keys) includes before-and-after c
 With Node.js 22.20 or later, run this from the project where you want the skill:
 
 ```sh
-    npx skills add painhardcore/blazing-rust --skill blazing-rust
+npx skills add painhardcore/blazing-rust --skill blazing-rust
 ```
 
 Choose your agent when prompted, or select it with `-a`:
