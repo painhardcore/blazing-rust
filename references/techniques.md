@@ -29,6 +29,7 @@ Read the section matching the measured cost. Check each API against the project'
 ## Vectorization
 
 - Check auto-vectorization first. Fixed-size chunks (`chunks_exact`), slices with known lengths, and simple loop bodies without early exits help the compiler emit SIMD. Confirm the result in the assembly. [Iterators and bounds](https://nnethercote.github.io/perf-book/bounds-checks.html)
+- Count or sum into narrow lanes (`u8` or `u16` arrays, flushed before they overflow) so the compiler keeps byte-wide vectors. Several independent accumulators hide instruction latency. Compare a few widths.
 - `std::simd` (portable SIMD) is nightly-only. Do not use it in stable projects. On stable, use `std::arch` intrinsics or an existing SIMD crate the project already depends on. [std::arch](https://doc.rust-lang.org/std/arch/index.html)
 - Gate target-specific code with `#[target_feature(enable = "...")]` and a runtime check such as `is_x86_feature_detected!`. Calling a target-feature function from code compiled without that feature is undefined behavior if the CPU lacks it, so the call needs `unsafe` and the check. Keep a scalar fallback and test it. [Dynamic CPU feature detection](https://doc.rust-lang.org/std/arch/index.html#dynamic-cpu-feature-detection)
 - Test remainder elements, empty and unaligned inputs, and floating-point results. SIMD reductions reorder additions, which can change floating-point output.
